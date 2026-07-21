@@ -1,79 +1,78 @@
 import re
-from typing import Tuple, Optional
+from typing import Optional, Tuple
+from urllib.parse import unquote, urlparse
 
 import wikipediaapi
 
 
 def extract_language_from_url(url: str) -> Optional[str]:
-    """
-    Extract language code from Wikipedia URL.
-
-    Args:
-        url: Wikipedia URL (e.g., 'https://ru.wikipedia.org/wiki/Python')
-
-    Returns:
-        Language code (e.g., 'ru') or None if not found.
-    """
-    pattern = r'https?://([a-z]{2})\.wikipedia\.org'
-    match = re.search(pattern, url)
-
-    if match:
-        return match.group(1)
-    return None
+    """Extract language code from a Wikipedia URL."""
+    hostname = urlparse(url).hostname or ""
+    match = re.match(r"^([a-z]{2})(?:\.m|\.zero)?\.wikipedia\.org$", hostname)
+    return match.group(1) if match else None
 
 
 def fetch_wikipedia_article(
-        url_or_title: str, language: Optional[str] = None
+    url_or_title: str,
+    language: Optional[str] = None,
+    user_agent: str = "Polyglot Summarizer/1.0"
 ) -> Tuple[str, str]:
     """
     Fetch Wikipedia article text by URL or title.
 
     Args:
-        url_or_title: Either a full Wikipedia URL or article title.
-        language: Language code (e.g., 'ru').
-                  Required if url_or_title is a title.
-                  Extracted from URL if url_or_title is a URL.
+        url_or_title: Full Wikipedia URL or article title.
+        language: Language code (e.g., 'ru'). Required if title is provided.
+        user_agent: User-Agent string for the API client.
 
     Returns:
         Tuple of (article_text, language_code).
 
     Raises:
-        ValueError: If language cannot be determined or article not found.
+        ValueError: If language cannot be determined, title is empty,
+                    or article is not found.
+        ConnectionError: If a network error occurs.
     """
-    # Step 1: Determine if input is URL or title
-    is_url = url_or_title.startswith(('http://', 'https://'))
+    is_url = url_or_title.startswith(("http://", "https://"))
 
-    # Step 2: Extract or validate language
     if is_url:
         lang = extract_language_from_url(url_or_title)
-        if lang is None:
+        if not lang:
             raise ValueError(
                 f"Cannot extract language from URL: {url_or_title}"
             )
-        # Extract article title from URL
-        title = url_or_title.split('/wiki/')[-1]
+
+        parsed = urlparse(url_or_title)
+        if (
+            not parsed.path.startswith("/wiki/")
+            or len(parsed.path) <= len("/wiki/")
+        ):
+            raise ValueError(f"Invalid Wikipedia URL format: {url_or_title}")
+
+        # Extract, decode, and clean the title
+        title = unquote(parsed.path.split("/wiki/", 1)[1])
+        title = title.split("#")[0]  # Remove URL fragments
     else:
-        if language is None:
+        if not language:
             raise ValueError(
-                "Language must be provided when using article title"
+                "Language must be provided when using an article title"
             )
         lang = language
         title = url_or_title
 
-    # Step 3: Initialize Wikipedia API client
-    wiki = wikipediaapi.Wikipedia(
-        user_agent=(
-            'polyglot-extractive-summarizer (ilia.a.shaposhnikov@gmail.com)'
-        ),
-        language=lang
-    )
+    if not title.strip():
+        raise ValueError("Article title cannot be empty")
 
-    # Step 4: Fetch article
-    page = wiki.page(title)
+    wiki = wikipediaapi.Wikipedia(user_agent=user_agent, language=lang)
 
-    # Step 5: Check if article exists
+    try:
+        page = wiki.page(title)
+    except Exception as e:
+        raise ConnectionError(
+            f"Network error while fetching article '{title}': {e}"
+        ) from e
+
     if not page.exists():
         raise ValueError(f"Article '{title}' not found in {lang} Wikipedia")
 
-    # Step 6: Return text and language
     return page.text, lang
