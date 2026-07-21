@@ -1,5 +1,12 @@
 import nltk
-nltk.download('punkt')
-nltk.download('punkt_tab')
-nltk.download('stopwords')
-print("NLTK данные успешно загружены.")
+
+packages = ['punkt', 'punkt_tab', 'stopwords']
+success = True
+
+for pkg in packages:
+    if not nltk.download(pkg):
+        print(f"Failed to download {pkg}")
+        success = False
+
+if success:
+    print("NLTK components installed successfully.")
