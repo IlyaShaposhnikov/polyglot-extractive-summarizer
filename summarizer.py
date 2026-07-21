@@ -1,6 +1,8 @@
 from typing import List, Optional
 
 from sumy.nlp.tokenizers import Tokenizer
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.summarizers.text_rank import TextRankSummarizer
 
 from languages import LANGUAGE_MAP
 
@@ -53,8 +55,15 @@ def summarize(
     # Clamp to valid range
     target_count = max(1, min(target_count, total))
 
-    # Step 4: Initialize sumy parser and summarizer for the given language.
-    # Run the summarization algorithm to get the top sentences.
+    # Step 4: Initialize sumy parser and summarizer
+    parser = PlaintextParser.from_string(text, tokenizer)
+    summarizer = TextRankSummarizer()
+    
+    # Run summarization
+    summary_sentences = summarizer(parser.document, sentences_count=target_count)
+    
+    # Extract text from Sentence objects
+    selected_texts = [str(sent) for sent in summary_sentences]
 
     # Step 5: Map the selected sentences back to their original indices.
     # Sort them by index to preserve the original text order.
