@@ -31,7 +31,9 @@ def summarize(
     # Step 1: Validate language
     if language not in LANGUAGE_MAP:
         supported = ', '.join(LANGUAGE_MAP.keys())
-        raise ValueError(f"Unsupported language: '{language}'. Supported: {supported}")
+        raise ValueError(
+            f"Unsupported language: '{language}'. Supported: {supported}"
+        )
 
     lang_name = LANGUAGE_MAP[language]
 
@@ -52,22 +54,22 @@ def summarize(
     else:
         target_count = round(total * 0.2)
 
-    # Clamp to valid range
     target_count = max(1, min(target_count, total))
 
     # Step 4: Initialize sumy parser and summarizer
     parser = PlaintextParser.from_string(text, tokenizer)
     summarizer = TextRankSummarizer()
-    
-    # Run summarization
-    summary_sentences = summarizer(parser.document, sentences_count=target_count)
-    
-    # Extract text from Sentence objects
+
+    summary_sentences = summarizer(
+        parser.document, sentences_count=target_count
+    )
     selected_texts = [str(sent) for sent in summary_sentences]
 
-    # Step 5: Map the selected sentences back to their original indices.
-    # Sort them by index to preserve the original text order.
+    # Step 5: Restore original order
+    sent_to_idx = {sent: idx for idx, sent in enumerate(sentences)}
+    indexed_selected = [(sent_to_idx[text], text) for text in selected_texts]
+    indexed_selected.sort(key=lambda x: x[0])
+    result = [text for _, text in indexed_selected]
 
-    # Step 6: Return the sorted list of sentences.
-
-    pass
+    # Step 6: Return the sorted list
+    return result
